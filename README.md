@@ -1,5 +1,6 @@
 # AegisGuard
 
+
 **AI-powered fraud detection and merchant risk investigation system**
 
 AegisGuard detects abnormal fraud patterns across merchant transactions, investigates the underlying signals, estimates financial exposure, and recommends bounded defensive actions.
@@ -28,7 +29,7 @@ A simple fraud classifier can identify individual risky transactions, but it may
 
 > **"Is this merchant experiencing an active fraud event right now?"**
 
-Fraud-Spike Sentinel focuses on detecting and investigating these **merchant-level fraud spikes**.
+AegisGuard focuses on detecting and investigating these **merchant-level fraud spikes**.
 
 ---
 
@@ -403,7 +404,7 @@ Synthetic data generation will deliberately introduce known fraud scenarios so t
 
 ## Project Structure
 
-
+```text
 fraud-spike-sentinel/
 │
 ├── data/
@@ -441,6 +442,7 @@ fraud-spike-sentinel/
 ├── Dockerfile
 ├── docker-compose.yml
 └── README.md
+```
 
 ---
 
