@@ -1,0 +1,69 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #e8eef7;
+  background: #0d1424;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+.app-shell {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  padding: 2rem;
+  background: radial-gradient(circle at top, #172746 0, #0d1424 55%);
+}
+
+.app-shell > * {
+  max-width: 680px;
+}
+
+.eyebrow {
+  margin: 0 0 1rem;
+  color: #6dd6b4;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2.25rem, 6vw, 4.5rem);
+  line-height: 1.05;
+}
+
+.intro {
+  color: #aebbd0;
+  font-size: 1.15rem;
+  line-height: 1.6;
+}
+
+.status-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: fit-content;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #29446a;
+  border-radius: 0.7rem;
+  background: #14223a;
+}
+
+.status-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: #6dd6b4;
+  box-shadow: 0 0 0 0.25rem #6dd6b422;
+}
