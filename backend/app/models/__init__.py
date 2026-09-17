@@ -7,6 +7,9 @@ from app.models.payment import (
     Device,
     Merchant,
     NetworkIdentity,
+    RiskRule,
+    RiskSignal,
+    RuleEvaluation,
     Transaction,
 )
 
@@ -17,5 +20,8 @@ __all__ = [
     "Device",
     "Merchant",
     "NetworkIdentity",
+    "RiskRule",
+    "RiskSignal",
+    "RuleEvaluation",
     "Transaction",
 ]

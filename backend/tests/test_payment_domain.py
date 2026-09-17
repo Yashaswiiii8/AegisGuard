@@ -75,7 +75,6 @@ def _create_transaction_payload(
     amount_minor: int = 125075,
     currency: str = "INR",
     occurred_at: datetime | None = None,
-    created_at: datetime | None = None,
     available_at: datetime | None = None,
     status: str = "authorized",
     payment_method: str = "card",
@@ -84,8 +83,6 @@ def _create_transaction_payload(
     now = datetime.now(timezone.utc)
     if occurred_at is None:
         occurred_at = now - timedelta(minutes=5)
-    if created_at is None:
-        created_at = now
     if available_at is None:
         available_at = now + timedelta(minutes=1)
 
@@ -100,7 +97,6 @@ def _create_transaction_payload(
         "country_code": country_code,
         "status": status,
         "occurred_at": occurred_at.isoformat(),
-        "created_at": created_at.isoformat(),
         "available_at": available_at.isoformat(),
     }
 
@@ -169,6 +165,7 @@ def test_successful_transaction_creation(payment_client: TestClient) -> None:
     assert body["network_identity_id"] == network_identity["id"]
     assert body["amount_minor"] == 125075
     assert body["currency"] == "INR"
+    assert body["created_at"] is not None
 
 
 def test_transaction_retrieval(payment_client: TestClient) -> None:
@@ -218,22 +215,87 @@ def test_transaction_uses_amount_minor_and_currency(payment_client: TestClient) 
     assert body["currency"] == "USD"
 
 
-def test_transaction_preserves_occurred_created_and_available_times(payment_client: TestClient) -> None:
+def test_transaction_generates_created_at_server_side(payment_client: TestClient) -> None:
     customer = _create_customer()
     merchant = _create_merchant()
     device = _create_device("device-007")
     network_identity = _create_network_identity("198.51.100.15", "ip_address", "US")
     occurred_at = datetime(2024, 7, 15, 8, 30, tzinfo=timezone.utc)
-    created_at = datetime(2024, 7, 15, 8, 31, tzinfo=timezone.utc)
     available_at = datetime(2024, 7, 15, 8, 45, tzinfo=timezone.utc)
     payload = _create_transaction_payload(
-        customer["id"], merchant["id"], device["id"], network_identity["id"], occurred_at=occurred_at, created_at=created_at, available_at=available_at
+        customer["id"], merchant["id"], device["id"], network_identity["id"], occurred_at=occurred_at, available_at=available_at
     )
     response = client.post("/transactions", json=payload)
     assert response.status_code == 201, response.text
     body = response.json()
+    server_created_at = datetime.fromisoformat(body["created_at"])
+    assert server_created_at.tzinfo is not None
+    assert abs((datetime.now(timezone.utc) - server_created_at.astimezone(timezone.utc)).total_seconds()) < 10
+
+
+def test_client_created_at_cannot_override_server_value(payment_client: TestClient) -> None:
+    customer = _create_customer()
+    merchant = _create_merchant()
+    device = _create_device("device-008")
+    network_identity = _create_network_identity("198.51.100.16", "ip_address", "US")
+    client_created_at = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    payload = _create_transaction_payload(
+        customer["id"], merchant["id"], device["id"], network_identity["id"], available_at=datetime(2024, 7, 15, 8, 45, tzinfo=timezone.utc)
+    )
+    payload["created_at"] = client_created_at.isoformat()
+    response = client.post("/transactions", json=payload)
+    assert response.status_code == 201, response.text
+    server_created_at = datetime.fromisoformat(response.json()["created_at"]).astimezone(timezone.utc)
+    assert server_created_at != client_created_at
+
+
+def test_transaction_normalizes_timezone_aware_timestamps_to_utc(payment_client: TestClient) -> None:
+    customer = _create_customer()
+    merchant = _create_merchant()
+    device = _create_device("device-009")
+    network_identity = _create_network_identity("198.51.100.17", "ip_address", "US")
+    occurred_at = datetime(2024, 7, 15, 14, 0, tzinfo=timezone(timedelta(hours=5, minutes=30)))
+    available_at = datetime(2024, 7, 15, 14, 15, tzinfo=timezone(timedelta(hours=5, minutes=30)))
+    payload = _create_transaction_payload(
+        customer["id"], merchant["id"], device["id"], network_identity["id"], occurred_at=occurred_at, available_at=available_at
+    )
+    response = client.post("/transactions", json=payload)
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert datetime.fromisoformat(body["occurred_at"]).astimezone(timezone.utc) == datetime(2024, 7, 15, 8, 30, tzinfo=timezone.utc)
+    assert datetime.fromisoformat(body["available_at"]).astimezone(timezone.utc) == datetime(2024, 7, 15, 8, 45, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize("field", ["occurred_at", "available_at"])
+def test_transaction_rejects_naive_timestamps(payment_client: TestClient, field: str) -> None:
+    customer = _create_customer()
+    merchant = _create_merchant()
+    device = _create_device(f"device-naive-{field}")
+    network_identity = _create_network_identity(f"198.51.100.{18 if field == 'occurred_at' else '19'}", "ip_address", "US")
+    payload = _create_transaction_payload(customer["id"], merchant["id"], device["id"], network_identity["id"])
+    payload[field] = "2024-07-15T08:30:00"
+    response = client.post("/transactions", json=payload)
+    assert response.status_code == 422
+    assert "Timestamp must include a timezone offset" in response.text
+
+
+def test_transaction_preserves_occurred_and_available_semantics(payment_client: TestClient) -> None:
+    customer = _create_customer()
+    merchant = _create_merchant()
+    device = _create_device("device-010")
+    network_identity = _create_network_identity("198.51.100.20", "ip_address", "US")
+    occurred_at = datetime(2024, 7, 15, 8, 30, tzinfo=timezone.utc)
+    available_at = datetime(2024, 7, 15, 8, 45, tzinfo=timezone.utc)
+    response = client.post(
+        "/transactions",
+        json=_create_transaction_payload(
+            customer["id"], merchant["id"], device["id"], network_identity["id"],
+            occurred_at=occurred_at, available_at=available_at,
+        ),
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
     assert datetime.fromisoformat(body["occurred_at"]).astimezone(timezone.utc) == occurred_at
-    assert datetime.fromisoformat(body["created_at"]).astimezone(timezone.utc) == created_at
     assert datetime.fromisoformat(body["available_at"]).astimezone(timezone.utc) == available_at
 
 

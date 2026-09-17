@@ -18,7 +18,11 @@ from app.schemas.payment import (
     TransactionCreate,
     TransactionRead,
 )
+from app.schemas.risk import RiskRuleCreate, RiskRuleRead, RiskSignalCreate, RiskSignalRead, RuleEvaluationRead
 from app.services.payment_service import PaymentService
+from app.services.risk_rules import RiskRuleService
+from app.services.risk_signals import RiskSignalService
+from app.services.rule_evaluation import RuleEvaluationService
 
 router = APIRouter()
 
@@ -116,7 +120,6 @@ def create_transaction(
         country_code=payload.country_code,
         status=payload.status,
         occurred_at=payload.occurred_at,
-        created_at=payload.created_at,
         available_at=payload.available_at,
     )
     return TransactionRead.model_validate(transaction)
@@ -126,3 +129,46 @@ def create_transaction(
 def get_transaction(transaction_id: UUID, db: Session = Depends(get_db)) -> TransactionRead:
     transaction = PaymentService.get_transaction(db, transaction_id)
     return TransactionRead.model_validate(transaction)
+
+
+@router.post("/risk-signals", response_model=RiskSignalRead, status_code=status.HTTP_201_CREATED)
+def create_risk_signal(
+    payload: RiskSignalCreate, db: Session = Depends(get_db)
+) -> RiskSignalRead:
+    signal = RiskSignalService.create(db, **payload.model_dump())
+    return RiskSignalRead.model_validate(signal)
+
+
+@router.get("/risk-signals/{signal_id}", response_model=RiskSignalRead)
+def get_risk_signal(signal_id: UUID, db: Session = Depends(get_db)) -> RiskSignalRead:
+    return RiskSignalRead.model_validate(RiskSignalService.get(db, signal_id))
+
+
+@router.post("/risk-rules", response_model=RiskRuleRead, status_code=status.HTTP_201_CREATED)
+def create_risk_rule(payload: RiskRuleCreate, db: Session = Depends(get_db)) -> RiskRuleRead:
+    rule = RiskRuleService.create(db, **payload.model_dump())
+    return RiskRuleRead.model_validate(rule)
+
+
+@router.get("/risk-rules/{rule_id}", response_model=RiskRuleRead)
+def get_risk_rule(rule_id: UUID, db: Session = Depends(get_db)) -> RiskRuleRead:
+    return RiskRuleRead.model_validate(RiskRuleService.get(db, rule_id))
+
+
+@router.post(
+    "/risk-rules/{rule_id}/evaluate/{transaction_id}",
+    response_model=RuleEvaluationRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def evaluate_risk_rule(
+    rule_id: UUID, transaction_id: UUID, db: Session = Depends(get_db)
+) -> RuleEvaluationRead:
+    evaluation = RuleEvaluationService.evaluate(db, rule_id, transaction_id)
+    return RuleEvaluationRead.model_validate(evaluation)
+
+
+@router.get("/rule-evaluations/{evaluation_id}", response_model=RuleEvaluationRead)
+def get_rule_evaluation(
+    evaluation_id: UUID, db: Session = Depends(get_db)
+) -> RuleEvaluationRead:
+    return RuleEvaluationRead.model_validate(RuleEvaluationService.get(db, evaluation_id))

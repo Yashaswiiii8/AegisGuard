@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -91,7 +91,7 @@ class CustomerDeviceRead(CustomerDeviceBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TransactionBase(BaseModel):
+class TransactionFields(BaseModel):
     customer_id: UUID
     merchant_id: UUID
     amount_minor: int = Field(..., ge=0)
@@ -102,7 +102,6 @@ class TransactionBase(BaseModel):
     country_code: str = Field(..., min_length=2, max_length=2)
     status: str
     occurred_at: datetime
-    created_at: datetime
     available_at: datetime
 
     @field_validator("currency")
@@ -115,12 +114,20 @@ class TransactionBase(BaseModel):
     def validate_country_code(cls, value: str) -> str:
         return value.upper()
 
+    @field_validator("occurred_at", "available_at")
+    @classmethod
+    def normalize_timestamp_to_utc(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("Timestamp must include a timezone offset")
+        return value.astimezone(timezone.utc)
 
-class TransactionCreate(TransactionBase):
+
+class TransactionCreate(TransactionFields):
     pass
 
 
-class TransactionRead(TransactionBase):
+class TransactionRead(TransactionFields):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    created_at: datetime

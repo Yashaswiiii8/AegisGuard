@@ -133,7 +133,6 @@ class PaymentService:
         country_code: str,
         status: str,
         occurred_at: datetime,
-        created_at: datetime,
         available_at: datetime,
     ) -> Transaction:
         PaymentService.get_customer(db, customer_id)
@@ -152,7 +151,6 @@ class PaymentService:
             country_code=country_code.upper(),
             status=status,
             occurred_at=occurred_at,
-            created_at=created_at,
             available_at=available_at,
         )
         db.add(transaction)

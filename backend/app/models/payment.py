@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index, String, func
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -149,6 +150,7 @@ class Transaction(Base):
     merchant: Mapped[Merchant] = relationship(back_populates="transactions")
     device: Mapped[Device] = relationship(back_populates="transactions")
     network_identity: Mapped[NetworkIdentity] = relationship(back_populates="transactions")
+    risk_signals: Mapped[list["RiskSignal"]] = relationship(back_populates="transaction")
 
     __table_args__ = (
         CheckConstraint("amount_minor >= 0", name="ck_transactions_amount_non_negative"),
@@ -158,4 +160,71 @@ class Transaction(Base):
         Index("ix_transactions_merchant_occurred", "merchant_id", "occurred_at"),
         Index("ix_transactions_device_occurred", "device_id", "occurred_at"),
         Index("ix_transactions_available_at", "available_at"),
+    )
+
+
+class RiskSignal(Base):
+    __tablename__ = "risk_signals"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    transaction_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("transactions.id"), nullable=True, index=True
+    )
+    signal_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    value: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    transaction: Mapped[Transaction | None] = relationship(back_populates="risk_signals")
+
+
+class RiskRule(Base):
+    __tablename__ = "risk_rules"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    description: Mapped[str] = mapped_column(String(500), nullable=False)
+    rule_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    configuration: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    evaluations: Mapped[list["RuleEvaluation"]] = relationship(back_populates="rule")
+
+    __table_args__ = (
+        Index("ix_risk_rules_name_version", "name", "version", unique=True),
+    )
+
+
+class RuleEvaluation(Base):
+    __tablename__ = "rule_evaluations"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    rule_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("risk_rules.id"), nullable=False, index=True
+    )
+    transaction_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("transactions.id"), nullable=False, index=True
+    )
+    rule_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    triggered: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    evaluated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    configuration_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    details: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+    rule: Mapped[RiskRule] = relationship(back_populates="evaluations")
+    transaction: Mapped[Transaction] = relationship()
+
+    __table_args__ = (
+        Index("ix_rule_evaluations_rule_transaction", "rule_id", "transaction_id"),
     )
