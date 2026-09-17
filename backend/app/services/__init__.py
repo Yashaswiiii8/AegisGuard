@@ -1,1 +1,5 @@
-"""Application services will be added with the first domain slice."""
+"""Application services for the V1 payment domain."""
+
+from app.services.payment_service import PaymentService
+
+__all__ = ["PaymentService"]

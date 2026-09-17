@@ -1,5 +1,21 @@
 """SQLAlchemy model registry."""
 
 from app.models.base import Base
+from app.models.payment import (
+    Customer,
+    CustomerDevice,
+    Device,
+    Merchant,
+    NetworkIdentity,
+    Transaction,
+)
 
-__all__ = ["Base"]
+__all__ = [
+    "Base",
+    "Customer",
+    "CustomerDevice",
+    "Device",
+    "Merchant",
+    "NetworkIdentity",
+    "Transaction",
+]
